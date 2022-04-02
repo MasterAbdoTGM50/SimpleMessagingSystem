@@ -7,21 +7,28 @@ import javax.swing.*;
 import javax.swing.plaf.nimbus.NimbusLookAndFeel;
 import java.awt.*;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.HashMap;
+import java.util.Map;
 
 public class Producer{
 
     private Socket producerSocket;
     private PrintWriter out;
+    ObjectOutputStream objectOutputStream;
+
 
     public void connect(String ip, int port) {
         try {
             producerSocket = new Socket(ip, port);
-            out = new PrintWriter(producerSocket.getOutputStream(), true);
-            out.write(Node.PRODUCER.getValue());
-            out.flush();
+//            out = new PrintWriter(producerSocket.getOutputStream(), true);
+//            out.write(Node.PRODUCER.getValue());
+//            out.flush();
+            objectOutputStream = new ObjectOutputStream(producerSocket.getOutputStream());
+            objectOutputStream.writeInt(Node.PRODUCER.getValue());
+            objectOutputStream.flush();
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -40,11 +47,18 @@ public class Producer{
         return producerSocket.isConnected();
     }
 
-    public void produce(String message){
+    public void produce(String message) throws IOException {
         if (producerSocket.isConnected()) {
+            Map<String,String> map = new HashMap<>();
+            map.put("text", message);
             String serializedMessage = new Gson()
-                    .toJson(new HashMap<String, String>().put("text", message));
-            out.print(serializedMessage);
+                    .toJson(map);
+//            out.print(serializedMessage);
+            objectOutputStream.writeUTF(serializedMessage);
+            objectOutputStream.flush();
+            System.out.println("P: " + serializedMessage);
+//            out.flush();
+//            out.flush();
         }
     }
 
@@ -87,8 +101,12 @@ public class Producer{
             }
 
             errorLabel.setVisible(false);
-            System.out.println(message);
-            producer.produce(message);
+//            System.out.println(message);
+            try {
+                producer.produce(message);
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
         });
 
         panel.add(messageLabel);
@@ -129,6 +147,8 @@ public class Producer{
 
         JTextField ipField = new JTextField(15);
         JTextField portField = new JTextField(10);
+        ipField.setText("localhost");
+        portField.setText("5050");
 
         JLabel connectionErrorLabel = new JLabel();
         connectionErrorLabel.setVisible(false);

@@ -8,6 +8,8 @@ public class Message implements Serializable {
     private String text;
     private String timestamp;
 
+    public Message(){}
+
     public String getTimestamp() {
         return timestamp;
     }
