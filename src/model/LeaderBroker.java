@@ -3,8 +3,6 @@ package model;
 
 import com.google.gson.Gson;
 
-import javax.swing.*;
-import java.awt.*;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -12,8 +10,8 @@ import java.util.List;
 
 public class LeaderBroker {
 
-    private PrintWriter out;
     private List<PartitionBroker> partitionBrokers;
+    private static final String LAST_SEEN_MESSAGE_ID_TEXT = "lastSeenMessageId: ";
     private int currentPartitionBrokerTurn;
 
     public LeaderBroker(){
@@ -34,7 +32,6 @@ public class LeaderBroker {
     }
 
     public void configureMessage(String text){
-        System.out.println("MESSAGE_TEXT: " + text);
         String messageTimestamp = LocalDateTime.now().toString();
         synchronized (this){
             String messageUUID = UUID.randomUUID().toString();
@@ -45,7 +42,6 @@ public class LeaderBroker {
                     .getMessages()
                     .add(message);
             currentPartitionBrokerTurn = (currentPartitionBrokerTurn + 1) % partitionBrokers.size();
-            System.out.println("MESSAGE_ID: " + id);
         }
     }
 
@@ -54,10 +50,8 @@ public class LeaderBroker {
         return consumptionFile.exists();
     }
 
-//    public void serveConsumerConsumption(Consumption consumption) throws IOException {
     public void serveConsumerConsumption(Consumption consumption, ObjectOutputStream objectOutputStream) throws IOException {
         if (consumption.getConsumptionId().isBlank()){
-//            sendAllMessages();
             sendAllMessages(objectOutputStream);
             return;
         }
@@ -69,8 +63,7 @@ public class LeaderBroker {
         File consumptionFile = new File(consumption.getConsumptionId() + ".txt");
         Scanner scanner = new Scanner(consumptionFile);
         StringBuilder lastSeenMessageId = new StringBuilder(
-                scanner.skip("lastSeenMessageId: ").nextLine());
-        System.out.println("FILE: " + lastSeenMessageId);
+                scanner.skip(LAST_SEEN_MESSAGE_ID_TEXT).nextLine());
 
         int lastSeenMessagePartition =
                 Integer.parseInt(lastSeenMessageId.substring(lastSeenMessageId.lastIndexOf("_") + 1 ));
@@ -84,9 +77,6 @@ public class LeaderBroker {
             int counter = 0;
             @Override
             public int compare(Message o1, Message o2) {
-                System.out.println(o1.getId());
-                System.out.println(o2.getId());
-                System.out.println("counter: " + (counter++));
                 if (o1.getId().equals(o2.getId())){
                     return 0;
                 }else if (isAfterTimestamps(o1, lastSeenMessageTimestamp)){
@@ -98,29 +88,20 @@ public class LeaderBroker {
         };
 
         int indexOfMessageInPartition = Collections.binarySearch(messages, new Message(lastSeenMessageId.toString(), "", lastSeenMessageTimestamp, lastSeenMessagePartition), c);
-        System.out.println("INDEX: " + indexOfMessageInPartition);
         List<Message> messagesToBeSent = new ArrayList<>();
-
-        System.out.println("Partition ID: " + lastSeenMessagePartition);
 
         for (int i = 0; i < partitionBrokers.size(); i++){
             int startingIndex = (lastSeenMessagePartition == i) ? indexOfMessageInPartition + 1 : 0;
-            System.out.println("starting index: " + startingIndex);
-            System.out.println("i: " + i + "Size: " + partitionBrokers.get(i).getMessages().size());
             for (int j = startingIndex; j < partitionBrokers.get(i).getMessages().size(); j++){
-                System.out.println("J: " + j);
                 Message msg = partitionBrokers.get(i).getMessages().get(j);
-                System.out.println("messageLoop: " + msg.getText());
                 if (!isAfterTimestamps(msg, lastSeenMessageTimestamp)){continue;}
                 messagesToBeSent.add(msg);
-                System.out.println("added: " + msg.getText());
             }
         }
 
         Gson gson = new Gson();
 
         if (messagesToBeSent.isEmpty()){
-//            out.print(gson.toJson(consumption));
             objectOutputStream.writeUTF(gson.toJson(consumption));
             scanner.close();
             return;
@@ -134,18 +115,15 @@ public class LeaderBroker {
         File consumptionfile = new File(consumptionId + ".txt");
         consumptionfile.createNewFile();
 
-        FileWriter fileWriter = new FileWriter(consumptionfile);
-        fileWriter.write("lastSeenMessageId: " + messagesToBeSent.get(messagesToBeSent.size() - 1).getId());
-        fileWriter.close();
+        try (FileWriter fileWriter = new FileWriter(consumptionfile)) {
+            fileWriter.write(LAST_SEEN_MESSAGE_ID_TEXT + messagesToBeSent.get(messagesToBeSent.size() - 1).getId());
+        }
 
         map.put("messages", messagesToBeSent);
         map.put("consumptionId", consumptionId);
         String serialized = gson.toJson(map);
-//        out.print(serialized);
-        System.out.println("newSerialized: " + serialized);
         objectOutputStream.writeUTF(serialized);
         objectOutputStream.flush();
-        System.out.println("After writing UTF");
 
         scanner.close();
     }
@@ -178,7 +156,7 @@ public class LeaderBroker {
         String lastSeenMessageId = messagesToBeSent.get(messagesToBeSent.size() - 1).getId();
         String consumptionId = UUID.randomUUID().toString();
 
-        Map<String, Object> map = new HashMap();
+        Map<String, Object> map = new HashMap<String, Object>();
         map.put("lastSeenMessageId", lastSeenMessageId);
 
         File consumptionFile = new File(consumptionId + ".txt");
@@ -188,31 +166,12 @@ public class LeaderBroker {
         map.put("messages", messagesToBeSent);
 
         String serializedMessages = gson.toJson(map);
-//        out.print(serializedMessages);
-        System.out.println("Serialized: " + serializedMessages);
         objectOutputStream.writeUTF(serializedMessages);
         objectOutputStream.flush();
 
-        System.out.println("AFTER");
-        FileWriter fileWriter = new FileWriter(consumptionFile);
-        fileWriter.write("lastSeenMessageId: " + lastSeenMessageId + "\nconsumptionId: " + consumptionId);
-        fileWriter.close();
+        try (FileWriter fileWriter = new FileWriter(consumptionFile)) {
+            fileWriter.write(LAST_SEEN_MESSAGE_ID_TEXT + lastSeenMessageId + "\nconsumptionId: " + consumptionId);
+        }
 
     }
-
-//    public static void main(String[] args) {
-//        JFrame jFrame = new JFrame("Leader");
-//        jFrame.setSize(650, 650);
-//        jFrame.setMaximumSize(new Dimension(1080, 720));
-//        jFrame.setMinimumSize(new Dimension(420, 420));
-//
-//        JPanel jPanel = new JPanel();
-//        jPanel.setBackground(Color.DARK_GRAY);
-//        jFrame.add(jPanel);
-//        jFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-//        jFrame.setVisible(true);
-
-//    }
-
-
 }

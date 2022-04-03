@@ -5,22 +5,24 @@ import com.google.gson.JsonObject;
 import enums.Node;
 
 import javax.swing.*;
+import javax.swing.event.AncestorEvent;
+import javax.swing.event.AncestorListener;
 import javax.swing.plaf.nimbus.NimbusLookAndFeel;
 import java.awt.*;
+import java.awt.event.*;
 import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Consumer{
 
     private Socket consumerSocket;
-    public String consumptionId;
+    private String consumptionId;
     private ObjectInputStream objectInputStream;
     private ObjectOutputStream objectOutputStream;
-    private BufferedReader in;
-    private PrintWriter out;
 
     public Consumer() {
         consumptionId = "";
@@ -31,7 +33,6 @@ public class Consumer{
     }
 
     public void connect(String ip, int port){
-        Gson gson = new Gson();
         try {
             consumerSocket = new Socket(ip, port);
             objectOutputStream = new ObjectOutputStream(consumerSocket.getOutputStream());
@@ -61,7 +62,6 @@ public class Consumer{
         request.put("consumptionId", consumptionId);
         String serializedRequest = gson.toJson(request);
         try {
-            System.out.println(serializedRequest);
             objectOutputStream.writeUTF(serializedRequest);
             objectOutputStream.flush();
         } catch (IOException e) {
@@ -74,21 +74,16 @@ public class Consumer{
     }
 
     public String listenForResponse() throws IOException {
-//        String s = "";
-//        System.out.println("Listening");
          return objectInputStream.readUTF();
-//        System.out.println(s);
-//        return s;
     }
 
     public void receiveAndProcessMessages(JTextArea inbox){
         Gson gson = new Gson();
-        String response = null;
+        String response;
         try {
             response = listenForResponse();
             JsonObject responseJson = gson.fromJson(response, JsonObject.class);
             String responseConsumptionId = responseJson.get("consumptionId").getAsString();
-
             if (!consumptionId.equals(responseConsumptionId)){
                 Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
                 Arrays.stream(messages)
@@ -100,6 +95,14 @@ public class Consumer{
             e.printStackTrace();
         }
 
+    }
+
+    public String getConsumptionId() {
+        return consumptionId;
+    }
+
+    public void setConsumptionId(String consumptionId) {
+        this.consumptionId = consumptionId;
     }
 
     public static void main(String[] args) throws UnsupportedLookAndFeelException {
@@ -125,33 +128,70 @@ public class Consumer{
         inbox.setEditable(false);
 
         JScrollPane inboxScrollPane = new JScrollPane(inbox);
-        inboxScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-        inboxScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        inboxScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+        inboxScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 
         JButton consumeButton = new JButton("CONSUME");
 
-        consumeButton.addActionListener(e -> {
-            consumer.consume();
-                Thread listenForResponsesThread = new Thread(() -> {
-                    //                        Gson gson = new Gson();
-//                        String response = consumer.listenForResponse();
-//                        JsonObject responseJson = gson.fromJson(response, JsonObject.class);
-//                        String responseConsumptionId = responseJson.get("consumptionId").getAsString();
-//
-//                        if (!consumer.consumptionId.equals(responseConsumptionId)){
-//                            Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
-//                            Arrays.stream(messages)
-//                                    .forEach(msg -> inbox.setText(inbox.getText() + "\n" + msg.getText()));
-//                            consumer.consumptionId = responseConsumptionId;
-//                        }
-                    consumer.receiveAndProcessMessages(inbox);
-//                        Thread.sleep((long) 1000 * 30);
+        /*
+        final Thread[] consumeEvery30SecondsThread = new Thread[1];
+        AtomicBoolean consumingProcessFlag = new AtomicBoolean(false);
+        panel.addComponentListener(new ComponentListener() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+            }
+
+            @Override
+            public void componentMoved(ComponentEvent e) {
+            }
+
+            @Override
+            public void componentShown(ComponentEvent e) {
+                System.out.println("hello");
+                consumeEvery30SecondsThread[0] = new Thread(() -> {
+                    while(consumeEvery30SecondsThread[0].isAlive()) {
+                        try{
+                            synchronized (consumingProcessFlag) {
+                                while (consumingProcessFlag.get()) {
+                                    System.out.println("Waiting 30SecsThread");
+                                    consumingProcessFlag.wait();
+                                }
+                                System.out.println("30 secs " + true);
+                                consumingProcessFlag.set(true);
+                                System.out.println("After");
+                                consumer.consume();
+                                consumer.receiveAndProcessMessages(inbox);
+                                consumingProcessFlag.set(false);
+                                System.out.println("F: " + consumingProcessFlag.get());
+                                consumingProcessFlag.notifyAll();
+                            }
+                        } catch (InterruptedException ex) {
+                            System.out.println("Interrupted");
+                        }
+                    }
                 });
-                listenForResponsesThread.start();
+                consumeEvery30SecondsThread[0].setName("consumeEvery30SecondsThread");
+                consumeEvery30SecondsThread[0].start();
+            }
+
+            @Override
+            public void componentHidden(ComponentEvent e) {
+                System.out.println("hidden");
+            }
         });
 
+*/
+        consumeButton.addActionListener(e -> {
+                    consumer.consume();
+                    Thread listenForResponsesThread = new Thread(() -> {
+                        consumer.receiveAndProcessMessages(inbox);
+                    });
+                    listenForResponsesThread.setName("listenForResponsesThread");
+                    listenForResponsesThread.start();
+        });
+
+
         panel.add(inboxLabel);
-//        panel.add(inbox);
         panel.add(inboxScrollPane);
         panel.add(consumeButton);
 
@@ -169,6 +209,33 @@ public class Consumer{
 
                     System.exit(0);
                 }
+            }
+        });
+
+        inbox.addAncestorListener(new AncestorListener() {
+            @Override
+            public void ancestorAdded(AncestorEvent event) {
+                while (consumer.isConnected()){
+                    System.out.println("before");
+                    consumeButton.doClick();
+                    System.out.println("after");
+                    try {
+                        Thread.sleep(5 * 1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            @Override
+            public void ancestorRemoved(AncestorEvent event) {
+                System.out.println("rem");
+
+            }
+
+            @Override
+            public void ancestorMoved(AncestorEvent event) {
+
             }
         });
 
@@ -207,7 +274,6 @@ public class Consumer{
             cardLayout.show(panelCards, "MESSAGE_CARD");
             consumer.connect(ip, Integer.parseInt(port));
             if (consumer.getConsumerSocket() != null && consumer.isConnected()){
-                System.out.println("wow");
                 connectionPanel.setVisible(false);
             }
         });

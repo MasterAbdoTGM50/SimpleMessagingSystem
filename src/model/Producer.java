@@ -8,7 +8,6 @@ import javax.swing.plaf.nimbus.NimbusLookAndFeel;
 import java.awt.*;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,16 +15,11 @@ import java.util.Map;
 public class Producer{
 
     private Socket producerSocket;
-    private PrintWriter out;
-    ObjectOutputStream objectOutputStream;
-
+    private ObjectOutputStream objectOutputStream;
 
     public void connect(String ip, int port) {
         try {
             producerSocket = new Socket(ip, port);
-//            out = new PrintWriter(producerSocket.getOutputStream(), true);
-//            out.write(Node.PRODUCER.getValue());
-//            out.flush();
             objectOutputStream = new ObjectOutputStream(producerSocket.getOutputStream());
             objectOutputStream.writeInt(Node.PRODUCER.getValue());
             objectOutputStream.flush();
@@ -53,12 +47,8 @@ public class Producer{
             map.put("text", message);
             String serializedMessage = new Gson()
                     .toJson(map);
-//            out.print(serializedMessage);
             objectOutputStream.writeUTF(serializedMessage);
             objectOutputStream.flush();
-            System.out.println("P: " + serializedMessage);
-//            out.flush();
-//            out.flush();
         }
     }
 
@@ -70,7 +60,6 @@ public class Producer{
 
         UIManager.setLookAndFeel(new NimbusLookAndFeel());
         Producer producer = new Producer();
-//        producer.connect("localhost", 5050);
         JFrame jFrame = new JFrame("Producer");
         jFrame.setSize(650, 650);
         jFrame.setMaximumSize(new Dimension(1080, 720));
@@ -101,7 +90,6 @@ public class Producer{
             }
 
             errorLabel.setVisible(false);
-//            System.out.println(message);
             try {
                 producer.produce(message);
             } catch (IOException ex) {
@@ -114,8 +102,6 @@ public class Producer{
 
         panel.add(submitButton);
         panel.add(errorLabel);
-
-//        jFrame.add(panel);
 
         jFrame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -137,7 +123,6 @@ public class Producer{
 
         JPanel connectionPanel = new JPanel();
 
-//        JLabel connectionLabel = new JLabel("Connection Page");
         JLabel connectToLabel = new JLabel("Connect to: ");
 
         JLabel ipLabel = new JLabel("ip");
@@ -155,8 +140,6 @@ public class Producer{
 
         JButton connectButton = new JButton("connect");
 
-//        connectionPanel.add(connectionLabel);
-
         connectButton.addActionListener(e -> {
             String ip = ipField.getText();
             String port = portField.getText();
@@ -168,12 +151,10 @@ public class Producer{
                 return;
             }
 
-            System.out.println("Connected");
             connectionErrorLabel.setVisible(false);
             cardLayout.show(panelCards, "MESSAGE_CARD");
             producer.connect(ip, Integer.parseInt(port));
             if (producer.getProducerSocket() != null && producer.isConnected()){
-                System.out.println("wow");
                 connectionPanel.setVisible(false);
             }
         });
