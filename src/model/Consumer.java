@@ -9,13 +9,9 @@ import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 import javax.swing.plaf.nimbus.NimbusLookAndFeel;
 import java.awt.*;
-import java.awt.event.*;
 import java.io.*;
 import java.net.Socket;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.*;
 
 public class Consumer{
 
@@ -87,7 +83,8 @@ public class Consumer{
             if (!consumptionId.equals(responseConsumptionId)){
                 Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
                 Arrays.stream(messages)
-                        .forEach(msg -> inbox.setText(inbox.getText() + "\n" + msg.getText()));
+                        .forEach(msg -> inbox.append(msg.getText() + "\n"));
+//                        .forEach(msg -> inbox.setText(inbox.getText() + "\n" + msg.getText()));
                 consumptionId = responseConsumptionId;
             }
 
@@ -133,59 +130,9 @@ public class Consumer{
 
         JButton consumeButton = new JButton("CONSUME");
 
-        /*
-        final Thread[] consumeEvery30SecondsThread = new Thread[1];
-        AtomicBoolean consumingProcessFlag = new AtomicBoolean(false);
-        panel.addComponentListener(new ComponentListener() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-            }
-
-            @Override
-            public void componentMoved(ComponentEvent e) {
-            }
-
-            @Override
-            public void componentShown(ComponentEvent e) {
-                System.out.println("hello");
-                consumeEvery30SecondsThread[0] = new Thread(() -> {
-                    while(consumeEvery30SecondsThread[0].isAlive()) {
-                        try{
-                            synchronized (consumingProcessFlag) {
-                                while (consumingProcessFlag.get()) {
-                                    System.out.println("Waiting 30SecsThread");
-                                    consumingProcessFlag.wait();
-                                }
-                                System.out.println("30 secs " + true);
-                                consumingProcessFlag.set(true);
-                                System.out.println("After");
-                                consumer.consume();
-                                consumer.receiveAndProcessMessages(inbox);
-                                consumingProcessFlag.set(false);
-                                System.out.println("F: " + consumingProcessFlag.get());
-                                consumingProcessFlag.notifyAll();
-                            }
-                        } catch (InterruptedException ex) {
-                            System.out.println("Interrupted");
-                        }
-                    }
-                });
-                consumeEvery30SecondsThread[0].setName("consumeEvery30SecondsThread");
-                consumeEvery30SecondsThread[0].start();
-            }
-
-            @Override
-            public void componentHidden(ComponentEvent e) {
-                System.out.println("hidden");
-            }
-        });
-
-*/
         consumeButton.addActionListener(e -> {
                     consumer.consume();
-                    Thread listenForResponsesThread = new Thread(() -> {
-                        consumer.receiveAndProcessMessages(inbox);
-                    });
+                    Thread listenForResponsesThread = new Thread(() -> consumer.receiveAndProcessMessages(inbox));
                     listenForResponsesThread.setName("listenForResponsesThread");
                     listenForResponsesThread.start();
         });
@@ -211,20 +158,18 @@ public class Consumer{
                 }
             }
         });
-
+//
         inbox.addAncestorListener(new AncestorListener() {
             @Override
             public void ancestorAdded(AncestorEvent event) {
-                while (consumer.isConnected()){
-                    System.out.println("before");
-                    consumeButton.doClick();
-                    System.out.println("after");
-                    try {
-                        Thread.sleep(5 * 1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                java.util.Timer timer = new java.util.Timer();
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        consumeButton.doClick();
                     }
-                }
+                }, 0, 30*1000);
+
             }
 
             @Override
@@ -235,7 +180,6 @@ public class Consumer{
 
             @Override
             public void ancestorMoved(AncestorEvent event) {
-
             }
         });
 

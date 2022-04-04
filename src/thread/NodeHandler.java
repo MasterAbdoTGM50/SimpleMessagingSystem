@@ -2,6 +2,7 @@ package thread;
 
 import com.google.gson.Gson;
 import enums.Node;
+import exception.InvalidOperationException;
 import model.*;
 
 import java.io.*;
@@ -43,19 +44,31 @@ public class NodeHandler implements Runnable{
     public void run() {
         try {
             handleOperations();
-        } catch (IOException | RuntimeException | InterruptedException e) {
+        } catch (InvalidOperationException e){
+            close();
+        } catch (IOException | RuntimeException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void close(){
+        try {
+            clientSocket.close();
+            objectOutputStream.close();
+            objectInputStream.close();
+        } catch (IOException e) {
             e.printStackTrace();
         }
 
     }
 
-    public void handleOperations() throws IOException, InterruptedException {
+    public void handleOperations() throws IOException {
         if (nodeChoice == Node.CONSUMER.getValue()){
             handleConsumerOperations();
         } else if (nodeChoice == Node.PRODUCER.getValue()){
             handleProducerOperations();
         }else {
-            throw new RuntimeException();
+            throw new InvalidOperationException("Invalid Operation choice was received");
         }
     }
 
