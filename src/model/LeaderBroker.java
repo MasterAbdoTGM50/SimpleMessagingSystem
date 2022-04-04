@@ -72,7 +72,6 @@ public class LeaderBroker {
         List messages = partitionBrokers
                 .get(lastSeenMessagePartition)
                 .getMessages();
-//        int indexOfMessageInPartition = Collections.binarySearch(messages, lastSeenMessageId);
         Comparator<Message> c = new Comparator<Message>() {
             int counter = 0;
             @Override
@@ -103,6 +102,7 @@ public class LeaderBroker {
 
         if (messagesToBeSent.isEmpty()){
             objectOutputStream.writeUTF(gson.toJson(consumption));
+            objectOutputStream.flush();
             scanner.close();
             return;
         }
@@ -151,6 +151,11 @@ public class LeaderBroker {
         List<Message> messagesToBeSent = new ArrayList<>();
         for (PartitionBroker partition : partitionBrokers){
             messagesToBeSent.addAll(partition.getMessages());
+        }
+
+        if (messagesToBeSent.size() == 0){
+            System.out.println("IN");
+            return;
         }
 
         String lastSeenMessageId = messagesToBeSent.get(messagesToBeSent.size() - 1).getId();

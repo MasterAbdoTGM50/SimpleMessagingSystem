@@ -5,8 +5,6 @@ import com.google.gson.JsonObject;
 import enums.Node;
 
 import javax.swing.*;
-import javax.swing.event.AncestorEvent;
-import javax.swing.event.AncestorListener;
 import javax.swing.plaf.nimbus.NimbusLookAndFeel;
 import java.awt.*;
 import java.io.*;
@@ -65,6 +63,15 @@ public class Consumer{
         }
     }
 
+    public boolean isNonEmptyBuffer(){
+        try {
+            return objectInputStream.available() != 0;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     public Socket getConsumerSocket() {
         return consumerSocket;
     }
@@ -81,10 +88,14 @@ public class Consumer{
             JsonObject responseJson = gson.fromJson(response, JsonObject.class);
             String responseConsumptionId = responseJson.get("consumptionId").getAsString();
             if (!consumptionId.equals(responseConsumptionId)){
-                Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
-                Arrays.stream(messages)
-                        .forEach(msg -> inbox.append(msg.getText() + "\n"));
-//                        .forEach(msg -> inbox.setText(inbox.getText() + "\n" + msg.getText()));
+                if (responseJson.get("messages").isJsonArray()){
+                    Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
+                    Arrays.stream(messages)
+                            .forEach(msg -> inbox.append(msg.getText() + "\n"));
+                }else{
+                    Message message = gson.fromJson(responseJson.get("messages"), Message.class);
+                    inbox.append(message.getText() + "\n");
+                }
                 consumptionId = responseConsumptionId;
             }
 
@@ -131,10 +142,29 @@ public class Consumer{
         JButton consumeButton = new JButton("CONSUME");
 
         consumeButton.addActionListener(e -> {
-                    consumer.consume();
-                    Thread listenForResponsesThread = new Thread(() -> consumer.receiveAndProcessMessages(inbox));
-                    listenForResponsesThread.setName("listenForResponsesThread");
-                    listenForResponsesThread.start();
+            consumeButton.setEnabled(false);
+            Thread listenForResponsesThread = new Thread(() -> {
+                boolean isWaitingForResponse = false;
+                while (consumer.isConnected()) {
+                    try {
+                        Thread.sleep(10 * 1000);
+                        if (!isWaitingForResponse){
+                            consumer.consume();
+                            isWaitingForResponse = true;
+                        }
+
+                        while (consumer.isNonEmptyBuffer()) {
+                            consumer.receiveAndProcessMessages(inbox);
+                            isWaitingForResponse = false;
+
+                        }
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            });
+            listenForResponsesThread.setName("listenForResponsesThread");
+            listenForResponsesThread.start();
         });
 
 
@@ -156,30 +186,6 @@ public class Consumer{
 
                     System.exit(0);
                 }
-            }
-        });
-//
-        inbox.addAncestorListener(new AncestorListener() {
-            @Override
-            public void ancestorAdded(AncestorEvent event) {
-                java.util.Timer timer = new java.util.Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        consumeButton.doClick();
-                    }
-                }, 0, 30*1000);
-
-            }
-
-            @Override
-            public void ancestorRemoved(AncestorEvent event) {
-                System.out.println("rem");
-
-            }
-
-            @Override
-            public void ancestorMoved(AncestorEvent event) {
             }
         });
 

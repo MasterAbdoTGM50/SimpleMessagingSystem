@@ -120,7 +120,6 @@ public class Producer{
             }
         });
 
-
         JPanel connectionPanel = new JPanel();
 
         JLabel connectToLabel = new JLabel("Connect to: ");
