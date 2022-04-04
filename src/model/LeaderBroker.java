@@ -72,7 +72,7 @@ public class LeaderBroker {
         List messages = partitionBrokers
                 .get(lastSeenMessagePartition)
                 .getMessages();
-//        int indexOfMessageInPartition = Collections.binarySearch(messages, lastSeenMessageId);
+
         Comparator<Message> c = new Comparator<Message>() {
             int counter = 0;
             @Override
