@@ -84,7 +84,6 @@ public class Consumer{
                 Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
                 Arrays.stream(messages)
                         .forEach(msg -> inbox.append(msg.getText() + "\n"));
-//                        .forEach(msg -> inbox.setText(inbox.getText() + "\n" + msg.getText()));
                 consumptionId = responseConsumptionId;
             }
 
@@ -158,7 +157,7 @@ public class Consumer{
                 }
             }
         });
-//
+
         inbox.addAncestorListener(new AncestorListener() {
             @Override
             public void ancestorAdded(AncestorEvent event) {
