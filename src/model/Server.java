@@ -5,6 +5,8 @@ import thread.NodeHandler;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.InputMismatchException;
+import java.util.Scanner;
 
 public class Server {
 
@@ -22,10 +24,30 @@ public class Server {
         }
     }
 
+    private void addNewPartitionBrokersThroughInput(Scanner scanner, LeaderBroker leaderBroker) {
+        int numberOfNewPartitions;
+        try {
+            System.out.print("Enter number of partition brokers that you want to add:");
+            numberOfNewPartitions = scanner.nextInt();
+            leaderBroker.addPartitionBrokers(numberOfNewPartitions);
+            System.out.println("-------------------------------------------------------------");
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
     public void startUp(){
         try{
             System.out.println("Server Started!");
             LeaderBroker leaderBroker = new LeaderBroker();
+            Thread partitionAdditionThread = new Thread(() -> {
+               while (true){
+                   Scanner scanner = new Scanner(System.in);
+                   addNewPartitionBrokersThroughInput(scanner, leaderBroker);
+               }
+            });
+            partitionAdditionThread.start();
+
             while (!serverSocket.isClosed()) {
                 Socket socket = serverSocket.accept();
                 System.out.println("Client connected!: " + socket.getRemoteSocketAddress().toString());
@@ -41,6 +63,7 @@ public class Server {
     public static void main(String[] args){
         Server server = new Server(5050);
         server.startUp();
+
     }
 
 }
