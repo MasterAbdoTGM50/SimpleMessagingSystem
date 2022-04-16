@@ -74,6 +74,16 @@ public class NodeHandler implements Runnable{
 
     public void handleProducerOperations() throws IOException {
         Gson gson = new Gson();
+        new Thread(() -> {
+            while (clientSocket.isConnected()) {
+                System.out.println("PARTITION SIZE PRODUCER: " + leaderBroker.getNumberOfPartitions());
+                try {
+                    Thread.sleep(15000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
         while (clientSocket.isConnected()){
             while (objectInputStream.available() != 0) {
                 String response = objectInputStream.readUTF();
@@ -84,6 +94,16 @@ public class NodeHandler implements Runnable{
     }
 
     public void handleConsumerOperations() throws IOException {
+        new Thread(() -> {
+            while (clientSocket.isConnected()) {
+                System.out.println("PARTITION SIZE CONSUMER: " + leaderBroker.getNumberOfPartitions());
+                try {
+                    Thread.sleep(15000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
         Gson gson = new Gson();
         while (clientSocket.isConnected()){
             while (objectInputStream.available() != 0) {

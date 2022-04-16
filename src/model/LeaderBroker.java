@@ -14,7 +14,7 @@ public class LeaderBroker {
     private static final String LAST_SEEN_MESSAGE_ID_TEXT = "lastSeenMessageId: ";
     private int currentPartitionBrokerTurn;
 
-    public LeaderBroker() {
+    public LeaderBroker(){
         currentPartitionBrokerTurn = 0;
         partitionBrokers = new ArrayList<>();
         partitionBrokers.add(new PartitionBroker());
@@ -27,13 +27,27 @@ public class LeaderBroker {
         this.partitionBrokers = partitionBrokers;
     }
 
-    public void addPartitionBroker(PartitionBroker singlePartitionBroker) {
+    public void addPartitionBroker(PartitionBroker singlePartitionBroker){
         partitionBrokers.add(singlePartitionBroker);
     }
 
-    public void configureMessage(String text) {
+    public void addPartitionBrokers(int numberOfNewPartitionBrokers) throws IllegalArgumentException{
+        if (numberOfNewPartitionBrokers < 0){
+            throw new IllegalArgumentException("Number of new Partitions can only be greater than zero");
+        }
+
+        for (int i = 0; i < numberOfNewPartitionBrokers; i++){
+            partitionBrokers.add(new PartitionBroker());
+        }
+    }
+
+    public int getNumberOfPartitions(){
+        return partitionBrokers.size();
+    }
+
+    public void configureMessage(String text){
         String messageTimestamp = LocalDateTime.now().toString();
-        synchronized (this) {
+        synchronized (this){
             String messageUUID = UUID.randomUUID().toString();
             String id = messageTimestamp + '_' + messageUUID + '_' + currentPartitionBrokerTurn;
             Message message = new Message(id, text, currentPartitionBrokerTurn);
@@ -45,18 +59,18 @@ public class LeaderBroker {
         }
     }
 
-    public boolean findConsumptionIdFile(Consumption consumption) {
+    public boolean findConsumptionIdFile(Consumption consumption){
         File consumptionFile = new File(consumption.getConsumptionId() + ".txt");
         return consumptionFile.exists();
     }
 
     public void serveConsumerConsumption(Consumption consumption, ObjectOutputStream objectOutputStream) throws IOException {
-        if (consumption.getConsumptionId().isBlank()) {
+        if (consumption.getConsumptionId().isBlank()){
             sendAllMessages(objectOutputStream);
             return;
         }
 
-        if (!findConsumptionIdFile(consumption)) {
+        if (!findConsumptionIdFile(consumption)){
             throw new FileNotFoundException();
         }
 
@@ -66,7 +80,7 @@ public class LeaderBroker {
                 scanner.skip(LAST_SEEN_MESSAGE_ID_TEXT).nextLine());
 
         int lastSeenMessagePartition =
-                Integer.parseInt(lastSeenMessageId.substring(lastSeenMessageId.lastIndexOf("_") + 1));
+                Integer.parseInt(lastSeenMessageId.substring(lastSeenMessageId.lastIndexOf("_") + 1 ));
         String lastSeenMessageTimestamp = lastSeenMessageId.substring(0, lastSeenMessageId.indexOf("_"));
 
         List messages = partitionBrokers
@@ -74,14 +88,13 @@ public class LeaderBroker {
                 .getMessages();
         Comparator<Message> c = new Comparator<Message>() {
             int counter = 0;
-
             @Override
             public int compare(Message o1, Message o2) {
-                if (o1.getId().equals(o2.getId())) {
+                if (o1.getId().equals(o2.getId())){
                     return 0;
-                } else if (isAfterTimestamps(o1, lastSeenMessageTimestamp)) {
+                }else if (isAfterTimestamps(o1, lastSeenMessageTimestamp)){
                     return 1;
-                } else {
+                }else {
                     return -1;
                 }
             }
@@ -90,20 +103,18 @@ public class LeaderBroker {
         int indexOfMessageInPartition = Collections.binarySearch(messages, new Message(lastSeenMessageId.toString(), "", lastSeenMessageTimestamp, lastSeenMessagePartition), c);
         List<Message> messagesToBeSent = new ArrayList<>();
 
-        for (int i = 0; i < partitionBrokers.size(); i++) {
+        for (int i = 0; i < partitionBrokers.size(); i++){
             int startingIndex = (lastSeenMessagePartition == i) ? indexOfMessageInPartition + 1 : 0;
-            for (int j = startingIndex; j < partitionBrokers.get(i).getMessages().size(); j++) {
+            for (int j = startingIndex; j < partitionBrokers.get(i).getMessages().size(); j++){
                 Message msg = partitionBrokers.get(i).getMessages().get(j);
-                if (!isAfterTimestamps(msg, lastSeenMessageTimestamp)) {
-                    continue;
-                }
+                if (!isAfterTimestamps(msg, lastSeenMessageTimestamp)){continue;}
                 messagesToBeSent.add(msg);
             }
         }
 
         Gson gson = new Gson();
 
-        if (messagesToBeSent.isEmpty()) {
+        if (messagesToBeSent.isEmpty()){
             objectOutputStream.writeUTF(gson.toJson(consumption));
             objectOutputStream.flush();
             scanner.close();
@@ -131,32 +142,32 @@ public class LeaderBroker {
         scanner.close();
     }
 
-    private boolean isAfterTimestamps(Message firstMessage, String olderMessage) {
+    private boolean isAfterTimestamps(Message firstMessage, String olderMessage){
         return
                 LocalDateTime.parse(parseTimeStamp(firstMessage)).
                         isAfter(LocalDateTime
                                 .parse(olderMessage));
     }
 
-    private boolean isAfterTimestamps(Message firstMessage, Message olderMessage) {
+    private boolean isAfterTimestamps(Message firstMessage, Message olderMessage){
         return
                 LocalDateTime.parse(parseTimeStamp(firstMessage)).
                         isAfter(LocalDateTime
                                 .parse(parseTimeStamp(olderMessage)));
     }
 
-    private String parseTimeStamp(Message message) {
+    private String parseTimeStamp(Message message){
         return message.getId().substring(0, message.getId().indexOf('_'));
     }
 
     public void sendAllMessages(ObjectOutputStream objectOutputStream) throws IOException {
         Gson gson = new Gson();
         List<Message> messagesToBeSent = new ArrayList<>();
-        for (PartitionBroker partition : partitionBrokers) {
+        for (PartitionBroker partition : partitionBrokers){
             messagesToBeSent.addAll(partition.getMessages());
         }
 
-        if (messagesToBeSent.size() == 0) {
+        if (messagesToBeSent.size() == 0){
             System.out.println("IN");
             return;
         }
