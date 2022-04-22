@@ -11,7 +11,7 @@ import java.io.*;
 import java.net.Socket;
 import java.util.*;
 
-public class Consumer{
+public class Consumer {
 
     private Socket consumerSocket;
     private String consumptionId;
@@ -22,11 +22,7 @@ public class Consumer{
         consumptionId = "";
     }
 
-    public Consumer(String consumptionId) {
-        this.consumptionId = consumptionId;
-    }
-
-    public void connect(String ip, int port){
+    public void connect(String ip, int port) {
         try {
             consumerSocket = new Socket(ip, port);
             objectOutputStream = new ObjectOutputStream(consumerSocket.getOutputStream());
@@ -38,11 +34,11 @@ public class Consumer{
         }
     }
 
-    public Boolean isConnected(){
+    public Boolean isConnected() {
         return consumerSocket.isConnected();
     }
 
-    public void close(){
+    public void close() {
         try {
             consumerSocket.close();
         } catch (IOException e) {
@@ -57,13 +53,14 @@ public class Consumer{
         String serializedRequest = gson.toJson(request);
         try {
             objectOutputStream.writeUTF(serializedRequest);
+            System.out.println("serialized: " + serializedRequest);
             objectOutputStream.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public boolean isNonEmptyBuffer(){
+    public boolean isNonEmptyBuffer() {
         try {
             return objectInputStream.available() != 0;
         } catch (IOException e) {
@@ -77,22 +74,25 @@ public class Consumer{
     }
 
     public String listenForResponse() throws IOException {
-         return objectInputStream.readUTF();
+        return objectInputStream.readUTF();
     }
 
-    public void receiveAndProcessMessages(JTextArea inbox){
+    public void receiveAndProcessMessages(JTextArea inbox) {
         Gson gson = new Gson();
         String response;
         try {
             response = listenForResponse();
             JsonObject responseJson = gson.fromJson(response, JsonObject.class);
+            if (responseJson.has("empty")) {
+                return;
+            }
             String responseConsumptionId = responseJson.get("consumptionId").getAsString();
-            if (!consumptionId.equals(responseConsumptionId)){
-                if (responseJson.get("messages").isJsonArray()){
+            if (!consumptionId.equals(responseConsumptionId)) {
+                if (responseJson.get("messages").isJsonArray()) {
                     Message[] messages = gson.fromJson(responseJson.getAsJsonArray("messages"), Message[].class);
                     Arrays.stream(messages)
                             .forEach(msg -> inbox.append(msg.getText() + "\n"));
-                }else{
+                } else {
                     Message message = gson.fromJson(responseJson.get("messages"), Message.class);
                     inbox.append(message.getText() + "\n");
                 }
@@ -103,14 +103,6 @@ public class Consumer{
             e.printStackTrace();
         }
 
-    }
-
-    public String getConsumptionId() {
-        return consumptionId;
-    }
-
-    public void setConsumptionId(String consumptionId) {
-        this.consumptionId = consumptionId;
     }
 
     public static void main(String[] args) throws UnsupportedLookAndFeelException {
@@ -148,7 +140,7 @@ public class Consumer{
                 while (consumer.isConnected()) {
                     try {
                         Thread.sleep(10 * 1000);
-                        if (!isWaitingForResponse){
+                        if (!isWaitingForResponse) {
                             consumer.consume();
                             isWaitingForResponse = true;
                         }
@@ -156,7 +148,6 @@ public class Consumer{
                         while (consumer.isNonEmptyBuffer()) {
                             consumer.receiveAndProcessMessages(inbox);
                             isWaitingForResponse = false;
-
                         }
                     } catch (InterruptedException ex) {
                         ex.printStackTrace();
@@ -166,7 +157,6 @@ public class Consumer{
             listenForResponsesThread.setName("listenForResponsesThread");
             listenForResponsesThread.start();
         });
-
 
         panel.add(inboxLabel);
         panel.add(inboxScrollPane);
@@ -178,9 +168,9 @@ public class Consumer{
                 if (JOptionPane.showConfirmDialog(frame,
                         "Are you sure you want to close this window?", "Close Window?",
                         JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION){
+                        JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
 
-                    if (consumer.getConsumerSocket() != null && consumer.isConnected()){
+                    if (consumer.getConsumerSocket() != null && consumer.isConnected()) {
                         consumer.close();
                     }
 
@@ -213,7 +203,7 @@ public class Consumer{
             String ip = ipField.getText();
             String port = portField.getText();
 
-            if (ip.isBlank() || port.isBlank() || port.matches(".*[Aa-zZ].*")){
+            if (ip.isBlank() || port.isBlank() || port.matches(".*[Aa-zZ].*")) {
                 connectionErrorLabel.setText("Fill the fields with valid info");
                 connectionErrorLabel.setForeground(Color.RED);
                 connectionErrorLabel.setVisible(true);
@@ -223,7 +213,7 @@ public class Consumer{
             connectionErrorLabel.setVisible(false);
             cardLayout.show(panelCards, "MESSAGE_CARD");
             consumer.connect(ip, Integer.parseInt(port));
-            if (consumer.getConsumerSocket() != null && consumer.isConnected()){
+            if (consumer.getConsumerSocket() != null && consumer.isConnected()) {
                 connectionPanel.setVisible(false);
             }
         });
@@ -251,5 +241,4 @@ public class Consumer{
 
 
     }
-
 }
