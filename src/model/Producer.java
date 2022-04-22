@@ -12,7 +12,7 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Producer{
+public class Producer {
 
     private Socket producerSocket;
     private ObjectOutputStream objectOutputStream;
@@ -29,7 +29,7 @@ public class Producer{
         }
     }
 
-    public void close(){
+    public void close() {
         try {
             producerSocket.close();
         } catch (IOException e) {
@@ -37,13 +37,13 @@ public class Producer{
         }
     }
 
-    public boolean isConnected(){
+    public boolean isConnected() {
         return producerSocket.isConnected();
     }
 
     public void produce(String message) throws IOException {
-        if (producerSocket.isConnected()) {
-            Map<String,String> map = new HashMap<>();
+        if (!producerSocket.isClosed()) {
+            Map<String, String> map = new HashMap<>();
             map.put("text", message);
             String serializedMessage = new Gson()
                     .toJson(map);
@@ -52,11 +52,11 @@ public class Producer{
         }
     }
 
-    public Socket getProducerSocket(){
+    public Socket getProducerSocket() {
         return producerSocket;
     }
 
-    public static void main(String[] args) throws UnsupportedLookAndFeelException{
+    public static void main(String[] args) throws UnsupportedLookAndFeelException {
 
         UIManager.setLookAndFeel(new NimbusLookAndFeel());
         Producer producer = new Producer();
@@ -84,7 +84,7 @@ public class Producer{
 
         submitButton.addActionListener(e -> {
             String message = messageField.getText();
-            if (message.isEmpty()){
+            if (message.isEmpty()) {
                 errorLabel.setVisible(true);
                 return;
             }
@@ -109,9 +109,9 @@ public class Producer{
                 if (JOptionPane.showConfirmDialog(jFrame,
                         "Are you sure you want to close this window?", "Close Window?",
                         JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION){
+                        JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
 
-                    if (producer.getProducerSocket() != null && producer.isConnected()){
+                    if (producer.getProducerSocket() != null && producer.isConnected()) {
                         producer.close();
                     }
 
@@ -143,7 +143,7 @@ public class Producer{
             String ip = ipField.getText();
             String port = portField.getText();
 
-            if (ip.isBlank() || port.isBlank() || port.matches(".*[Aa-zZ].*")){
+            if (ip.isBlank() || port.isBlank() || port.matches(".*[Aa-zZ].*")) {
                 connectionErrorLabel.setText("Fill the fields with valid info");
                 connectionErrorLabel.setForeground(Color.RED);
                 connectionErrorLabel.setVisible(true);
@@ -153,7 +153,7 @@ public class Producer{
             connectionErrorLabel.setVisible(false);
             cardLayout.show(panelCards, "MESSAGE_CARD");
             producer.connect(ip, Integer.parseInt(port));
-            if (producer.getProducerSocket() != null && producer.isConnected()){
+            if (producer.getProducerSocket() != null && producer.isConnected()) {
                 connectionPanel.setVisible(false);
             }
         });
@@ -180,5 +180,4 @@ public class Producer{
         jFrame.setVisible(true);
 
     }
-
 }
