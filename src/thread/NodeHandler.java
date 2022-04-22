@@ -8,25 +8,13 @@ import model.*;
 import java.io.*;
 import java.net.Socket;
 
-public class NodeHandler implements Runnable{
+public class NodeHandler implements Runnable {
 
     private LeaderBroker leaderBroker;
     private Socket clientSocket;
     private int nodeChoice;
     private ObjectOutputStream objectOutputStream;
     private ObjectInputStream objectInputStream;
-
-    public NodeHandler(Socket clientSocket, int nodeChoice) {
-        this.clientSocket = clientSocket;
-        this.nodeChoice = nodeChoice;
-        leaderBroker = new LeaderBroker();
-    }
-
-    public NodeHandler(LeaderBroker leaderBroker, Socket clientSocket, int nodeChoice) {
-        this.leaderBroker = leaderBroker;
-        this.clientSocket = clientSocket;
-        this.nodeChoice = nodeChoice;
-    }
 
     public NodeHandler(LeaderBroker leaderBroker, Socket clientSocket) {
         try {
@@ -44,14 +32,14 @@ public class NodeHandler implements Runnable{
     public void run() {
         try {
             handleOperations();
-        } catch (InvalidOperationException e){
+        } catch (InvalidOperationException e) {
             close();
         } catch (IOException | RuntimeException e) {
             e.printStackTrace();
         }
     }
 
-    private void close(){
+    private void close() {
         try {
             clientSocket.close();
             objectOutputStream.close();
@@ -63,28 +51,20 @@ public class NodeHandler implements Runnable{
     }
 
     public void handleOperations() throws IOException {
-        if (nodeChoice == Node.CONSUMER.getValue()){
+        if (nodeChoice == Node.CONSUMER.getValue()) {
             handleConsumerOperations();
-        } else if (nodeChoice == Node.PRODUCER.getValue()){
+        } else if (nodeChoice == Node.PRODUCER.getValue()) {
             handleProducerOperations();
-        }else {
+        } else if (nodeChoice == Node.PARTITION.getValue()) {
+            handlePartitionOperations();
+        } else {
             throw new InvalidOperationException("Invalid Operation choice was received");
         }
     }
 
     public void handleProducerOperations() throws IOException {
         Gson gson = new Gson();
-        new Thread(() -> {
-            while (clientSocket.isConnected()) {
-                System.out.println("PARTITION SIZE PRODUCER: " + leaderBroker.getNumberOfPartitions());
-                try {
-                    Thread.sleep(15000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
-        while (clientSocket.isConnected()){
+        while (clientSocket.isConnected()) {
             while (objectInputStream.available() != 0) {
                 String response = objectInputStream.readUTF();
                 Message message = gson.fromJson(response, Message.class);
@@ -94,18 +74,8 @@ public class NodeHandler implements Runnable{
     }
 
     public void handleConsumerOperations() throws IOException {
-        new Thread(() -> {
-            while (clientSocket.isConnected()) {
-                System.out.println("PARTITION SIZE CONSUMER: " + leaderBroker.getNumberOfPartitions());
-                try {
-                    Thread.sleep(15000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
         Gson gson = new Gson();
-        while (clientSocket.isConnected()){
+        while (!clientSocket.isClosed()) {
             while (objectInputStream.available() != 0) {
                 String clientRequest = objectInputStream.readUTF();
                 Consumption consumption = gson.fromJson(clientRequest, Consumption.class);
@@ -114,11 +84,25 @@ public class NodeHandler implements Runnable{
         }
     }
 
-    public int getNodeChoice() {
-        return nodeChoice;
-    }
+    public synchronized void handlePartitionOperations() throws IOException {
+        if (leaderBroker.getNumberOfPartitions() < leaderBroker.getNumberOfAcceptablePartitions()) {
+            leaderBroker.addPartitionBroker(clientSocket, objectOutputStream, objectInputStream);
+            return;
+        }
 
-    public void setNodeChoice(int nodeChoice) {
-        this.nodeChoice = nodeChoice;
+        if (leaderBroker.getNumberOfQueuePartitions() == LeaderBroker.PARTITION_QUEUE_CAPACITY) {
+            clientSocket.close();
+            return;
+        } else {
+            leaderBroker.addToPartitionQueue(clientSocket, objectOutputStream, objectInputStream);
+        }
+
+        new Thread(() -> {
+            while (!clientSocket.isClosed()) {
+
+            }
+            leaderBroker.removeDisconnectedSocket(clientSocket);
+        }).start();
+
     }
 }
