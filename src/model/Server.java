@@ -5,7 +5,6 @@ import thread.NodeHandler;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class Server {
@@ -16,7 +15,7 @@ public class Server {
         this.serverSocket = serverSocket;
     }
 
-    public Server(int port){
+    public Server(int port) {
         try {
             serverSocket = new ServerSocket(port);
         } catch (IOException e) {
@@ -31,20 +30,21 @@ public class Server {
             numberOfNewPartitions = scanner.nextInt();
             leaderBroker.addPartitionBrokers(numberOfNewPartitions);
             System.out.println("-------------------------------------------------------------");
-        } catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public void startUp(){
-        try{
+    public void startUp() {
+        try {
             System.out.println("Server Started!");
             LeaderBroker leaderBroker = new LeaderBroker();
+            leaderBroker.setNumberOfAcceptablePartitions(4);
             Thread partitionAdditionThread = new Thread(() -> {
-               while (true){
-                   Scanner scanner = new Scanner(System.in);
-                   addNewPartitionBrokersThroughInput(scanner, leaderBroker);
-               }
+                while (true) {
+                    Scanner scanner = new Scanner(System.in);
+                    addNewPartitionBrokersThroughInput(scanner, leaderBroker);
+                }
             });
             partitionAdditionThread.start();
 
@@ -53,17 +53,14 @@ public class Server {
                 System.out.println("Client connected!: " + socket.getRemoteSocketAddress().toString());
                 Thread nodeHandlerThread = new Thread(new NodeHandler(leaderBroker, socket));
                 nodeHandlerThread.start();
-
             }
-        }catch (IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         Server server = new Server(5050);
         server.startUp();
-
     }
-
 }
